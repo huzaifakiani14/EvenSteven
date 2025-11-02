@@ -12,17 +12,26 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || 'YOUR_APP_ID',
 };
 
-// Debug: Log Firebase config status (in development only)
-if (import.meta.env.DEV) {
-  const hasConfig = firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
-  console.log('Firebase Config:', {
-    hasConfig,
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
+// Validate Firebase config (works in both dev and production)
+const hasValidConfig = 
+  firebaseConfig.apiKey && 
+  firebaseConfig.apiKey !== 'YOUR_API_KEY' &&
+  firebaseConfig.authDomain && 
+  firebaseConfig.authDomain !== 'YOUR_AUTH_DOMAIN';
+
+if (!hasValidConfig) {
+  console.error('❌ Firebase configuration is missing or incomplete!');
+  console.error('Missing variables:', {
+    apiKey: !firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY',
+    authDomain: !firebaseConfig.authDomain || firebaseConfig.authDomain === 'YOUR_AUTH_DOMAIN',
+    projectId: !firebaseConfig.projectId || firebaseConfig.projectId === 'YOUR_PROJECT_ID',
   });
-  if (!hasConfig) {
-    console.warn('⚠️ Firebase config is missing! Please check your .env file.');
-  }
+  console.error('Please ensure all VITE_FIREBASE_* environment variables are set in Vercel.');
+} else {
+  console.log('✅ Firebase config loaded:', {
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+  });
 }
 
 // Initialize Firebase
