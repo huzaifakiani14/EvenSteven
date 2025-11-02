@@ -1,92 +1,90 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getInvite, acceptInvite, declineInvite } from '../services/inviteService';
 import { useAuth } from '../contexts/AuthContext';
-import type { Invite } from '../types';
+import type { Group } from '../types';
 
 export const JoinPage = () => {
   const { user, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [invite, setInvite] = useState<Invite | null>(null);
+  const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
 
-  const inviteId = searchParams.get('inviteId');
+  const groupId = searchParams.get('groupId');
 
   useEffect(() => {
-    const loadInvite = async () => {
-      if (!inviteId) {
-        setError('Invalid invite link. Missing invite ID.');
+    const loadGroup = async () => {
+      if (!groupId) {
+        setError('Invalid invite link. Missing group ID.');
         setLoading(false);
         return;
       }
 
       try {
-        const inviteData = await getInvite(inviteId);
-        if (!inviteData) {
-          setError('Invite not found or has been deleted.');
-          setLoading(false);
-          return;
-        }
-
-        setInvite(inviteData);
-
-        // Check if user is logged in and email matches
-        if (!authLoading && user) {
-          if (user.email.toLowerCase() !== inviteData.invitedEmail.toLowerCase()) {
-            setError(`This invite is for ${inviteData.invitedEmail}, but you're signed in as ${user.email}. Please sign out and sign in with the correct account.`);
-          }
+        const { getGroup } = await import('../services/firebaseService');
+        const groupData = await getGroup(groupId);
+        if (groupData) {
+          setGroup(groupData);
+        } else {
+          setError('Group not found or has been deleted.');
         }
       } catch (error: any) {
-        console.error('Error loading invite:', error);
-        setError(error.message || 'Failed to load invite.');
+        console.error('Error loading group:', error);
+        setError(error.message || 'Failed to load group.');
       } finally {
         setLoading(false);
       }
     };
 
     if (!authLoading) {
-      loadInvite();
+      loadGroup();
     }
-  }, [inviteId, user, authLoading]);
+  }, [groupId, authLoading]);
 
   const handleAccept = async () => {
-    if (!user || !invite) return;
-
-    if (user.email.toLowerCase() !== invite.invitedEmail.toLowerCase()) {
-      setError('Email mismatch. Please sign in with the correct account.');
-      return;
-    }
+    if (!user || !group) return;
 
     try {
       setProcessing(true);
       setError('');
-      await acceptInvite(invite.id, user.uid);
-      navigate(`/groups/${invite.groupId}`);
+      const { getGroup, updateGroup } = await import('../services/firebaseService');
+      
+      const currentGroup = await getGroup(group.id);
+      if (!currentGroup) {
+        throw new Error('Group not found');
+      }
+
+      // Add user to group if not already a member
+      if (!currentGroup.members.includes(user.uid)) {
+        const updatedMembers = [...currentGroup.members, user.uid];
+        const membersDetail = currentGroup.membersDetail || {};
+        membersDetail[user.uid] = {
+          uid: user.uid,
+          name: user.name,
+          email: user.email,
+          role: 'member',
+          joinedAt: new Date(),
+        };
+
+        await updateGroup(group.id, {
+          members: updatedMembers,
+          membersDetail,
+        } as any);
+      }
+
+      navigate(`/groups/${group.id}`);
     } catch (error: any) {
-      console.error('Error accepting invite:', error);
-      setError(error.message || 'Failed to accept invite. Please try again.');
+      console.error('Error joining group:', error);
+      setError(error.message || 'Failed to join group. Please try again.');
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleDecline = async () => {
-    if (!invite) return;
-
-    try {
-      setProcessing(true);
-      setError('');
-      await declineInvite(invite.id);
-      navigate('/groups');
-    } catch (error: any) {
-      console.error('Error declining invite:', error);
-      setError(error.message || 'Failed to decline invite. Please try again.');
-    } finally {
-      setProcessing(false);
-    }
+  const handleDecline = () => {
+    navigate('/groups');
   };
 
   if (authLoading || loading) {
@@ -116,7 +114,7 @@ export const JoinPage = () => {
     );
   }
 
-  if (error && !invite) {
+  if (error && !group) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8 text-center">
@@ -133,43 +131,23 @@ export const JoinPage = () => {
     );
   }
 
-  if (!invite) {
+  if (!group) {
     return null;
   }
-
-  const emailMatches = user.email.toLowerCase() === invite.invitedEmail.toLowerCase();
-  const canAccept = emailMatches && invite.status === 'pending';
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-white mb-2">Group Invitation</h2>
-          {invite.status === 'accepted' && (
-            <p className="text-green-400 mb-4">✓ You've already accepted this invitation</p>
-          )}
-          {invite.status === 'declined' && (
-            <p className="text-red-400 mb-4">This invitation has been declined</p>
-          )}
+          <h2 className="text-2xl font-bold text-white mb-2">Join Group</h2>
         </div>
 
         <div className="bg-gray-700 rounded-lg p-6 mb-6">
           <p className="text-gray-300 mb-4">
             You've been invited to join
           </p>
-          <h3 className="text-xl font-bold text-white mb-4">{invite.groupName}</h3>
-          <p className="text-gray-400 text-sm">
-            Invited by <span className="text-white font-semibold">{invite.invitedByName}</span>
-          </p>
+          <h3 className="text-xl font-bold text-white mb-4">{group.name}</h3>
         </div>
-
-        {!emailMatches && (
-          <div className="bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-4 mb-6">
-            <p className="text-yellow-300 text-sm">
-              ⚠️ This invite is for <strong>{invite.invitedEmail}</strong>, but you're signed in as <strong>{user.email}</strong>.
-            </p>
-          </div>
-        )}
 
         {error && (
           <div className="bg-red-900 bg-opacity-30 border border-red-600 rounded-lg p-4 mb-6">
@@ -177,33 +155,22 @@ export const JoinPage = () => {
           </div>
         )}
 
-        {invite.status === 'pending' && (
-          <div className="flex space-x-3">
-            <button
-              onClick={handleAccept}
-              disabled={!canAccept || processing}
-              className="flex-1 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            >
-              {processing ? 'Processing...' : 'Accept'}
-            </button>
-            <button
-              onClick={handleDecline}
-              disabled={processing}
-              className="flex-1 bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-            >
-              {processing ? 'Processing...' : 'Decline'}
-            </button>
-          </div>
-        )}
-
-        {invite.status !== 'pending' && (
+        <div className="flex space-x-3">
           <button
-            onClick={() => navigate('/groups')}
-            className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors font-semibold"
+            onClick={handleAccept}
+            disabled={processing}
+            className="flex-1 bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
           >
-            Go to Groups
+            {processing ? 'Joining...' : 'Join Group'}
           </button>
-        )}
+          <button
+            onClick={handleDecline}
+            disabled={processing}
+            className="flex-1 bg-red-600 hover:bg-red-700 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+          >
+            Decline
+          </button>
+        </div>
       </div>
     </div>
   );

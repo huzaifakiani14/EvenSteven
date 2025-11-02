@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getGroup, subscribeToExpenses, createExpense, subscribeToActivities } from '../services/firebaseService';
 import { calculateBalances, minimizeTransactions } from '../utils/balanceCalculator';
 import { useAuth } from '../contexts/AuthContext';
-import { InviteMembers } from './InviteMembers';
+import { useToast } from '../hooks/useToast';
 import type { Group, Expense, Activity, Balance, Settlement, GroupMember } from '../types';
 import { getUser } from '../services/firebaseService';
 import type { User } from '../types';
@@ -22,7 +22,7 @@ export const GroupDetails = () => {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'expenses' | 'balances' | 'activity' | 'members'>('expenses');
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const { showToast, ToastComponent } = useToast();
 
   useEffect(() => {
     if (!groupId || !user) return;
@@ -113,6 +113,44 @@ export const GroupDetails = () => {
     );
   };
 
+  const handleShareInvite = async () => {
+    if (!groupId || !group) return;
+
+    const inviteLink = `${window.location.origin}/join?groupId=${groupId}`;
+
+    // Check if Web Share API is available (mobile devices)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join ${group.name} on EvenSteven 💸`,
+          text: `Let's split expenses easily! Tap below to join:`,
+          url: inviteLink,
+        });
+        showToast('✅ Invite link shared successfully!', 'success');
+      } catch (err: any) {
+        // User cancelled or share failed
+        if (err.name !== 'AbortError') {
+          console.error('Share failed:', err);
+          // Fallback to clipboard
+          await handleCopyToClipboard(inviteLink);
+        }
+      }
+    } else {
+      // Fallback to clipboard for desktop
+      await handleCopyToClipboard(inviteLink);
+    }
+  };
+
+  const handleCopyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('📋 Link copied to clipboard!', 'success');
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      showToast('Failed to copy link. Please try again.', 'error');
+    }
+  };
+
   if (!group || !user) {
     return (
       <div className="text-center py-12">
@@ -123,6 +161,7 @@ export const GroupDetails = () => {
 
   return (
     <div>
+      {ToastComponent}
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link to="/groups" className="text-blue-400 hover:text-blue-300 mb-2 inline-block">
@@ -130,12 +169,22 @@ export const GroupDetails = () => {
           </Link>
           <h2 className="text-3xl font-bold">{group.name}</h2>
         </div>
-        <button
-          onClick={() => setShowExpenseModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
-        >
-          + Add Expense
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleShareInvite}
+            className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-semibold px-4 sm:px-5 py-2 rounded-lg shadow-md transition-transform hover:scale-105 active:scale-95 flex items-center gap-2"
+          >
+            <span>🤝</span>
+            <span className="hidden sm:inline">Invite via Link</span>
+            <span className="sm:hidden">Invite</span>
+          </button>
+          <button
+            onClick={() => setShowExpenseModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
+          >
+            + Add Expense
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -318,14 +367,6 @@ export const GroupDetails = () => {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-semibold">Group Members</h3>
-            {group.createdBy === user.uid && (
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
-              >
-                + Invite Members
-              </button>
-            )}
           </div>
 
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
@@ -397,44 +438,6 @@ export const GroupDetails = () => {
             )}
           </div>
 
-          {group.createdBy === user.uid && !showInviteModal && (
-            <InviteMembers
-              group={group}
-              onInviteSent={() => {
-                setShowInviteModal(false);
-                // Refresh group data
-                if (groupId) {
-                  getGroup(groupId).then(setGroup);
-                }
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Invite Members</h3>
-              <button
-                onClick={() => setShowInviteModal(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <InviteMembers
-              group={group}
-              onInviteSent={() => {
-                setShowInviteModal(false);
-                if (groupId) {
-                  getGroup(groupId).then(setGroup);
-                }
-              }}
-            />
-          </div>
         </div>
       )}
 

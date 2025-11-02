@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
-import { InvitesDropdown } from './InvitesDropdown';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,7 +28,6 @@ export const Layout = ({ children }: LayoutProps) => {
             <div className="flex items-center space-x-4">
               {user && (
                 <div className="flex items-center space-x-3">
-                  <InvitesDropdown />
                   {user.photoURL && (
                     <img
                       src={user.photoURL}
