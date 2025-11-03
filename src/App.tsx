@@ -54,8 +54,8 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
-      <AuthWatcher />
       <Router>
+        <AuthWatcher />
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             <Route
