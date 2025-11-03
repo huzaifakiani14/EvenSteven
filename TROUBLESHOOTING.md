@@ -6,7 +6,7 @@ If Google Sign-In is not working, follow these steps:
 
 ### Enable Google Sign-In Provider
 1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project: `evensteven-a459f`
+2. Select your project: `YOUR_PROJECT_ID`
 3. Navigate to **Authentication** → **Sign-in method**
 4. Click on **Google** provider
 5. Toggle **Enable** to ON
@@ -17,7 +17,7 @@ If Google Sign-In is not working, follow these steps:
 1. In Firebase Console, go to **Authentication** → **Settings** → **Authorized domains**
 2. Make sure these domains are listed:
    - `localhost` (for local development)
-   - `evensteven-a459f.firebaseapp.com`
+   - `YOUR_PROJECT_ID.firebaseapp.com`
    - Your Vercel domain (after deployment)
 3. Click **Add domain** if `localhost` is missing
 
@@ -33,7 +33,7 @@ Open your browser's Developer Tools (F12) and check the Console tab for errors. 
 ## 3. Check Environment Variables
 
 Make sure your `.env` file exists and has the correct values:
-- File should be in the root directory: `/Users/huzaifakiani/EvenSteven/.env`
+- File should be in the root directory: `<project-root>/.env`
 - Restart the dev server after creating/editing `.env` file
 
 ## 4. Clear Browser Cache

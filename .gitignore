@@ -16,6 +16,9 @@ dist-ssr
 .env.production.local
 .env.development.local
 
+# Scripts with sensitive data
+setup-vercel-env.sh
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
