@@ -390,14 +390,16 @@ export const createPayment = async (
     
     try {
       let finalUserName = userName || '';
+      const [creatorUser, fromUser, toUser] = await Promise.all([
+        finalUserName ? Promise.resolve(null) : getUser(paymentData.createdBy),
+        getUser(paymentData.from),
+        getUser(paymentData.to),
+      ]);
+
       if (!finalUserName) {
-        const user = await getUser(paymentData.createdBy);
-        finalUserName = user?.name || 'Someone';
+        finalUserName = creatorUser?.name || 'Someone';
       }
-      
-      const fromUser = await getUser(paymentData.from);
-      const toUser = await getUser(paymentData.to);
-      
+
       await createActivity({
         groupId: paymentData.groupId,
         type: 'expense_added',
