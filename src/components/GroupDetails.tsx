@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getGroup, subscribeToExpenses, createExpense, subscribeToActivities } from '../services/firebaseService';
 import { calculateBalances, minimizeTransactions } from '../utils/balanceCalculator';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
-import type { Group, Expense, Activity, Balance, Settlement, GroupMember } from '../types';
+import type { Group, Expense, Activity, GroupMember } from '../types';
 import { getUser } from '../services/firebaseService';
 import type { User } from '../types';
 
@@ -14,8 +14,6 @@ export const GroupDetails = () => {
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [balances, setBalances] = useState<Balance[]>([]);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [users, setUsers] = useState<Map<string, User>>(new Map());
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseTitle, setExpenseTitle] = useState('');
@@ -33,9 +31,6 @@ export const GroupDetails = () => {
     // Subscribe to expenses
     const unsubscribeExpenses = subscribeToExpenses(groupId, (updatedExpenses) => {
       setExpenses(updatedExpenses);
-      const calculated = calculateBalances(updatedExpenses);
-      setBalances(calculated);
-      setSettlements(minimizeTransactions(calculated));
     });
 
     // Subscribe to activities
@@ -67,14 +62,14 @@ export const GroupDetails = () => {
     loadUsers();
   }, [group]);
 
-  const handleCreateExpense = async (e: React.FormEvent) => {
+  const handleCreateExpense = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !groupId || !expenseTitle.trim() || !expenseAmount || selectedMembers.length === 0) return;
 
     try {
       const amount = parseFloat(expenseAmount);
       if (isNaN(amount) || amount <= 0) {
-        alert('Please enter a valid amount');
+        showToast('Please enter a valid amount', 'error');
         return;
       }
 
@@ -95,25 +90,38 @@ export const GroupDetails = () => {
         user.name
       );
 
+      // Success: close modal, reset form, show toast
+      showToast('💸 Expense added successfully!', 'success');
       setExpenseTitle('');
       setExpenseAmount('');
       setSelectedMembers([]);
       setShowExpenseModal(false);
     } catch (error) {
       console.error('Error creating expense:', error);
-      alert('Failed to create expense. Please try again.');
+      showToast('❌ Failed to add expense. Please try again.', 'error');
     }
-  };
+  }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, showToast]);
 
-  const toggleMember = (memberId: string) => {
+  const toggleMember = useCallback((memberId: string) => {
     setSelectedMembers((prev) =>
       prev.includes(memberId)
         ? prev.filter((id) => id !== memberId)
         : [...prev, memberId]
     );
-  };
+  }, []);
 
-  const handleShareInvite = async () => {
+  // Memoize expensive calculations
+  const balances = useMemo(() => {
+    if (expenses.length === 0) return [];
+    return calculateBalances(expenses);
+  }, [expenses]);
+
+  const settlements = useMemo(() => {
+    if (balances.length === 0) return [];
+    return minimizeTransactions(balances);
+  }, [balances]);
+
+  const handleShareInvite = useCallback(async () => {
     if (!groupId || !group) return;
 
     const inviteLink = `${window.location.origin}/join?groupId=${groupId}`;
@@ -139,9 +147,9 @@ export const GroupDetails = () => {
       // Fallback to clipboard for desktop
       await handleCopyToClipboard(inviteLink);
     }
-  };
+  }, [groupId, group, showToast]);
 
-  const handleCopyToClipboard = async (text: string) => {
+  const handleCopyToClipboard = useCallback(async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       showToast('📋 Link copied to clipboard!', 'success');
@@ -149,7 +157,7 @@ export const GroupDetails = () => {
       console.error('Failed to copy to clipboard:', err);
       showToast('Failed to copy link. Please try again.', 'error');
     }
-  };
+  }, [showToast]);
 
   if (!group || !user) {
     return (

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { subscribeToGroups, createGroup } from '../services/firebaseService';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
 import type { Group } from '../types';
 
 export const GroupsList = () => {
@@ -10,6 +11,7 @@ export const GroupsList = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(false);
+  const { showToast, ToastComponent } = useToast();
 
   useEffect(() => {
     if (!user) return;
@@ -21,9 +23,9 @@ export const GroupsList = () => {
     return () => unsubscribe();
   }, [user]);
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const handleCreateGroup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !groupName.trim()) return;
+    if (!user || !groupName.trim() || loading) return;
 
     try {
       setLoading(true);
@@ -39,20 +41,24 @@ export const GroupsList = () => {
           email: user.email,
         }
       );
+      
+      // Success: close modal, reset form, show toast
+      showToast('✅ Group created successfully!', 'success');
       setGroupName('');
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error creating group:', error);
-      alert('Failed to create group. Please try again.');
+      showToast('❌ Failed to create group. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, groupName, loading, showToast]);
 
   if (!user) return null;
 
   return (
     <div>
+      {ToastComponent}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold">Your Groups</h2>
         <button

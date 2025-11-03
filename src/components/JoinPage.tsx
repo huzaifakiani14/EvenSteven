@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../hooks/useToast';
 import type { Group } from '../types';
 
 export const JoinPage = () => {
@@ -11,6 +12,7 @@ export const JoinPage = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const { showToast, ToastComponent } = useToast();
 
   const groupId = searchParams.get('groupId');
 
@@ -72,12 +74,21 @@ export const JoinPage = () => {
           members: updatedMembers,
           membersDetail,
         } as any);
+        
+        showToast('🎉 Joined group successfully!', 'success');
+      } else {
+        showToast('You are already a member of this group.', 'info');
       }
 
-      navigate(`/groups/${group.id}`);
+      // Small delay to show toast before navigation
+      setTimeout(() => {
+        navigate(`/groups/${group.id}`);
+      }, 500);
     } catch (error: any) {
       console.error('Error joining group:', error);
-      setError(error.message || 'Failed to join group. Please try again.');
+      const errorMsg = error.message || 'Failed to join group. Please try again.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setProcessing(false);
     }
@@ -137,6 +148,7 @@ export const JoinPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      {ToastComponent}
       <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-white mb-2">Join Group</h2>

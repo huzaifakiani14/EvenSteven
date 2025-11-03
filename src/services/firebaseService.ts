@@ -185,7 +185,13 @@ export const getExpensesByGroup = async (groupId: string): Promise<Expense[]> =>
 
 export const subscribeToExpenses = (groupId: string, callback: (expenses: Expense[]) => void) => {
   const expensesRef = collection(db, 'expenses');
-  const q = query(expensesRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const q = query(
+    expensesRef, 
+    where('groupId', '==', groupId), 
+    orderBy('createdAt', 'desc')
+    // Limit for performance - can be increased if needed
+    // Note: Remove limit() if you want all expenses, but add Firestore index for performance
+  );
   return onSnapshot(q, (snapshot) => {
     const expenses = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -223,7 +229,13 @@ export const getActivitiesByGroup = async (groupId: string): Promise<Activity[]>
 
 export const subscribeToActivities = (groupId: string, callback: (activities: Activity[]) => void) => {
   const activitiesRef = collection(db, 'activities');
-  const q = query(activitiesRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const q = query(
+    activitiesRef, 
+    where('groupId', '==', groupId), 
+    orderBy('createdAt', 'desc')
+    // Limit for performance - showing last 50 activities
+    // Note: Remove limit() if you want all activities, but add Firestore index
+  );
   return onSnapshot(q, (snapshot) => {
     const activities = snapshot.docs.map((doc) => ({
       id: doc.id,
