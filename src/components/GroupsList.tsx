@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { subscribeToGroups, createGroup } from '../services/firebaseService';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
@@ -12,6 +12,7 @@ export const GroupsList = () => {
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(false);
   const { showToast, ToastComponent } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
@@ -29,7 +30,7 @@ export const GroupsList = () => {
 
     try {
       setLoading(true);
-      await createGroup(
+      const newGroupId = await createGroup(
         {
           name: groupName.trim(),
           createdBy: user.uid,
@@ -46,6 +47,11 @@ export const GroupsList = () => {
       showToast('✅ Group created successfully!', 'success');
       setGroupName('');
       setShowCreateModal(false);
+
+      // Navigate immediately to the new group for faster perceived performance
+      if (newGroupId) {
+        navigate(`/groups/${newGroupId}`);
+      }
     } catch (error) {
       console.error('Error creating group:', error);
       showToast('❌ Failed to create group. Please try again.', 'error');
