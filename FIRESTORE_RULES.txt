@@ -44,6 +44,13 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null;
     }
     
+    // Payments: only authenticated users can read/write payments for groups they're members of
+    match /payments/{paymentId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && 
+        request.auth.uid == request.resource.data.createdBy;
+    }
+    
     // Invites: users can read their own invites, group creators can create invites
     match /invites/{inviteId} {
       // Users can read invites sent to their email

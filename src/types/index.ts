@@ -68,3 +68,15 @@ export interface Invite {
   createdAt: Date;
 }
 
+export interface Payment {
+  id: string;
+  groupId: string;
+  from: string; // User UID who paid
+  to: string; // User UID who received
+  amount: number;
+  paymentMethod: 'cash' | 'zelle' | 'venmo' | 'paypal' | 'other';
+  note?: string;
+  createdBy: string; // User UID who recorded the payment
+  createdAt: Date;
+}
+

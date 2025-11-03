@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { generateJoinCode } from '../utils/joinCodeGenerator';
-import type { User, Group, Expense, Activity, GroupMember } from '../types';
+import type { User, Group, Expense, Activity, GroupMember, Payment } from '../types';
 
 // User operations
 export const createUser = async (uid: string, userData: Omit<User, 'uid' | 'createdAt'>): Promise<void> => {
@@ -328,5 +328,128 @@ export const subscribeToActivities = (groupId: string, callback: (activities: Ac
     })) as Activity[];
     callback(activities);
   });
+};
+
+export const createPayment = async (
+  paymentData: Omit<Payment, 'id' | 'createdAt'>,
+  userName?: string
+): Promise<string> => {
+  if (!paymentData.groupId || !paymentData.from || !paymentData.to || !paymentData.amount || !paymentData.createdBy) {
+    throw new Error('Missing required payment fields');
+  }
+
+  if (paymentData.from === paymentData.to) {
+    throw new Error('Cannot record payment from person to themselves');
+  }
+
+  if (paymentData.amount <= 0) {
+    throw new Error('Payment amount must be greater than 0');
+  }
+
+  try {
+    const group = await getGroup(paymentData.groupId);
+    if (!group) {
+      throw new Error('Group not found');
+    }
+    if (!group.members.includes(paymentData.createdBy)) {
+      throw new Error('You must be a member of the group to record payments');
+    }
+  } catch (groupError: any) {
+    if (groupError?.message && (groupError.message.includes('not found') || groupError.message.includes('member'))) {
+      throw groupError;
+    }
+  }
+
+  const paymentsRef = collection(db, 'payments');
+  
+  try {
+    const paymentDoc: any = {
+      groupId: paymentData.groupId,
+      from: paymentData.from,
+      to: paymentData.to,
+      amount: paymentData.amount,
+      paymentMethod: paymentData.paymentMethod,
+      createdBy: paymentData.createdBy,
+      createdAt: Timestamp.now(),
+    };
+    
+    if (paymentData.note && paymentData.note.trim()) {
+      paymentDoc.note = paymentData.note.trim();
+    }
+
+    const docRef = await addDoc(paymentsRef, paymentDoc);
+    
+    try {
+      let finalUserName = userName || '';
+      if (!finalUserName) {
+        const user = await getUser(paymentData.createdBy);
+        finalUserName = user?.name || 'Someone';
+      }
+      
+      const fromUser = await getUser(paymentData.from);
+      const toUser = await getUser(paymentData.to);
+      
+      await createActivity({
+        groupId: paymentData.groupId,
+        type: 'expense_added',
+        message: `recorded payment: ${fromUser?.name || 'Someone'} paid ${toUser?.name || 'someone'} $${paymentData.amount.toFixed(2)} via ${paymentData.paymentMethod}`,
+        userId: paymentData.createdBy,
+        userName: finalUserName,
+      });
+    } catch (activityError) {
+      console.error('Error creating payment activity:', activityError);
+    }
+    
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Error creating payment:', error);
+    if (error?.code === 'permission-denied') {
+      throw new Error('Permission denied. Please check Firestore security rules allow payment creation.');
+    }
+    throw error;
+  }
+};
+
+export const getPaymentsByGroup = async (groupId: string): Promise<Payment[]> => {
+  const paymentsRef = collection(db, 'payments');
+  const q = query(paymentsRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate() || new Date(),
+  })) as Payment[];
+};
+
+export const subscribeToPayments = (groupId: string, callback: (payments: Payment[]) => void) => {
+  const paymentsRef = collection(db, 'payments');
+  const q = query(
+    paymentsRef, 
+    where('groupId', '==', groupId), 
+    orderBy('createdAt', 'desc')
+  );
+  return onSnapshot(
+    q, 
+    (snapshot) => {
+      const payments = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+      })) as Payment[];
+      callback(payments);
+    },
+    (error) => {
+      console.error('Error subscribing to payments:', error);
+      if (error?.code === 'failed-precondition') {
+        console.error('Firestore index missing for payments. Please create a composite index: payments (groupId, createdAt)');
+      }
+      callback([]);
+    }
+  );
+};
+
+export const deletePayment = async (paymentId: string): Promise<void> => {
+  const paymentRef = doc(db, 'payments', paymentId);
+  await deleteDoc(paymentRef);
 };
 

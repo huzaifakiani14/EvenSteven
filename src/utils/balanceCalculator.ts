@@ -1,8 +1,6 @@
-import type { Expense, Balance, Settlement } from '../types';
+import type { Expense, Balance, Settlement, Payment } from '../types';
 
-export const calculateBalances = (expenses: Expense[]): Balance[] => {
-  // Track net balances between pairs of users
-  // Key format: "userId1-userId2" where userId1 < userId2 (for consistency)
+export const calculateBalances = (expenses: Expense[], payments: Payment[] = []): Balance[] => {
   const netBalances: Map<string, number> = new Map();
 
   expenses.forEach((expense) => {
@@ -10,16 +8,11 @@ export const calculateBalances = (expenses: Expense[]): Balance[] => {
 
     expense.sharedWith.forEach((memberId) => {
       if (memberId !== expense.paidBy) {
-        // This member owes money to the person who paid
         const from = memberId;
         const to = expense.paidBy;
-        
-        // Create consistent key (always smaller ID first)
         const key = from < to ? `${from}-${to}` : `${to}-${from}`;
         const currentBalance = netBalances.get(key) || 0;
         
-        // If from < to, this is a positive balance (from owes to)
-        // If to < from, this is a negative balance (to owes from)
         if (from < to) {
           netBalances.set(key, currentBalance + amountPerPerson);
         } else {
@@ -29,17 +22,28 @@ export const calculateBalances = (expenses: Expense[]): Balance[] => {
     });
   });
 
-  // Convert to Balance array format
+  payments.forEach((payment) => {
+    const from = payment.from;
+    const to = payment.to;
+    const key = from < to ? `${from}-${to}` : `${to}-${from}`;
+    const currentBalance = netBalances.get(key) || 0;
+    
+    if (from < to) {
+      netBalances.set(key, currentBalance - payment.amount);
+    } else {
+      netBalances.set(key, currentBalance + payment.amount);
+    }
+  });
+
   const result: Balance[] = [];
   netBalances.forEach((amount, key) => {
-    if (Math.abs(amount) > 0.01) {
+    const roundedAmount = Math.round(amount * 100) / 100;
+    if (Math.abs(roundedAmount) >= 0.01) {
       const [id1, id2] = key.split('-');
-      if (amount > 0) {
-        // id1 owes id2
-        result.push({ from: id1, to: id2, amount: Math.abs(amount) });
+      if (roundedAmount > 0) {
+        result.push({ from: id1, to: id2, amount: Math.abs(roundedAmount) });
       } else {
-        // id2 owes id1
-        result.push({ from: id2, to: id1, amount: Math.abs(amount) });
+        result.push({ from: id2, to: id1, amount: Math.abs(roundedAmount) });
       }
     }
   });
@@ -48,17 +52,13 @@ export const calculateBalances = (expenses: Expense[]): Balance[] => {
 };
 
 export const minimizeTransactions = (balances: Balance[]): Settlement[] => {
-  // Calculate net amounts for each user
   const netAmounts: Map<string, number> = new Map();
 
   balances.forEach((balance) => {
-    // User who owes money (negative)
     netAmounts.set(balance.from, (netAmounts.get(balance.from) || 0) - balance.amount);
-    // User who gets money (positive)
     netAmounts.set(balance.to, (netAmounts.get(balance.to) || 0) + balance.amount);
   });
 
-  // Separate debtors (negative) and creditors (positive)
   const debtors: Array<{ id: string; amount: number }> = [];
   const creditors: Array<{ id: string; amount: number }> = [];
 
@@ -70,11 +70,9 @@ export const minimizeTransactions = (balances: Balance[]): Settlement[] => {
     }
   });
 
-  // Sort by amount (largest first)
   debtors.sort((a, b) => b.amount - a.amount);
   creditors.sort((a, b) => b.amount - a.amount);
 
-  // Greedy algorithm to minimize transactions
   const settlements: Settlement[] = [];
   let debtorIndex = 0;
   let creditorIndex = 0;
@@ -82,7 +80,6 @@ export const minimizeTransactions = (balances: Balance[]): Settlement[] => {
   while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
     const debtor = debtors[debtorIndex];
     const creditor = creditors[creditorIndex];
-
     const amount = Math.min(debtor.amount, creditor.amount);
 
     settlements.push({
@@ -94,12 +91,8 @@ export const minimizeTransactions = (balances: Balance[]): Settlement[] => {
     debtor.amount -= amount;
     creditor.amount -= amount;
 
-    if (debtor.amount < 0.01) {
-      debtorIndex++;
-    }
-    if (creditor.amount < 0.01) {
-      creditorIndex++;
-    }
+    if (debtor.amount < 0.01) debtorIndex++;
+    if (creditor.amount < 0.01) creditorIndex++;
   }
 
   return settlements;

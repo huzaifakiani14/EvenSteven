@@ -59,19 +59,20 @@ export const GroupsList = () => {
   return (
     <div>
       {ToastComponent}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold">Your Groups</h2>
-        <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <h2 className="text-2xl sm:text-3xl font-bold">Your Groups</h2>
+        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
           <Link
             to="/join-code"
-            className="bg-emerald-600 hover:bg-emerald-700 px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
+            className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 px-4 sm:px-6 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
           >
             <span>🧾</span>
-            <span>Join by Code</span>
+            <span className="hidden sm:inline">Join by Code</span>
+            <span className="sm:hidden">Join Code</span>
           </Link>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
+            className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 px-4 sm:px-6 py-2 rounded-lg transition-colors text-sm sm:text-base"
           >
             + New Group
           </button>
@@ -79,30 +80,30 @@ export const GroupsList = () => {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Create New Group</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-md">
+            <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Create New Group</h3>
             <form onSubmit={handleCreateGroup}>
               <input
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 placeholder="Group name"
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 mb-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 sm:px-4 py-2 mb-3 sm:mb-4 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
-              <div className="flex justify-end space-x-3">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors text-sm sm:text-base"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading || !groupName.trim()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 text-sm sm:text-base"
                 >
                   {loading ? 'Creating...' : 'Create'}
                 </button>
@@ -117,15 +118,15 @@ export const GroupsList = () => {
           <p className="text-gray-400 mb-4">No groups yet. Create one to get started!</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {groups.map((group) => (
             <Link
               key={group.id}
               to={`/groups/${group.id}`}
-              className="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 transition-colors border border-gray-700"
+              className="bg-gray-800 hover:bg-gray-700 rounded-lg p-4 sm:p-6 transition-colors border border-gray-700"
             >
-              <h3 className="text-xl font-semibold mb-2">{group.name}</h3>
-              <p className="text-gray-400 text-sm">
+              <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">{group.name}</h3>
+              <p className="text-gray-400 text-xs sm:text-sm">
                 {group.members.length} member{group.members.length !== 1 ? 's' : ''}
               </p>
             </Link>

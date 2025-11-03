@@ -1,188 +1,115 @@
 # EvenSteven 💸
 
-A simplified Splitwise clone for splitting bills, tracking expenses, and managing group balances fairly.
+A bill-splitting app for groups to track expenses, manage balances, and settle up fairly.
 
 ## Features
 
-- 🔐 **Google Sign-In** - Secure authentication with Firebase
-- 👥 **Multi-User Groups** - Create groups and invite others via email
-- 📧 **Email Invitations** - Invite users by email with secure join links
-- 💰 **Expense Tracking** - Add expenses with title, amount, and split configuration
-- 📊 **Balance Dashboard** - View who owes whom with real-time updates
-- 🎯 **Smart Settlements** - Optimized payment suggestions to minimize transactions
-- 📱 **Activity Feed** - Track recent actions in each group
-- 🔔 **Invite Notifications** - See pending invitations in the navigation bar
-- 👤 **Member Management** - View all group members with roles (admin/member)
-- 🎨 **Modern UI** - Beautiful dark-mode interface with Tailwind CSS
+- **Google Authentication** - Sign in with Google via Firebase
+- **Group Management** - Create groups and invite friends via shareable links or join codes
+- **Expense Tracking** - Add expenses, specify who paid, and split among members
+- **Balance Calculation** - Real-time calculation of who owes whom
+- **Payment Recording** - Record payments (cash, Zelle, Venmo, PayPal) to clear balances
+- **Smart Settlements** - Optimized payment suggestions to minimize transactions
+- **Activity Feed** - Track all group activity and changes
+- **Mobile Responsive** - Works great on phones and tablets
+- **Dark Theme** - Modern dark-mode UI
 
 ## Tech Stack
 
-- **Frontend:** React + TypeScript + Vite + Tailwind CSS
+- **Frontend:** React 19, TypeScript, Vite
+- **Styling:** Tailwind CSS
 - **Backend:** Firebase (Firestore + Authentication)
-- **Hosting:** Vercel (auto-deployment configured)
+- **Deployment:** Vercel with automatic CI/CD
 
-## Setup Instructions
+## Getting Started
 
-### 1. Firebase Setup
+### Prerequisites
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Create a new project or use an existing one
-3. Enable Authentication:
-   - Go to Authentication > Sign-in method
-   - Enable Google Sign-In provider
-4. Create Firestore Database:
-   - Go to Firestore Database
-   - Create database in production mode
-   - Set up security rules (see below)
-5. Get your Firebase configuration:
-   - Go to Project Settings > General
-   - Scroll down to "Your apps" and click the web icon (</>)
-   - Copy your Firebase configuration values
+- Node.js 18+ and npm
+- Firebase account
+- Vercel account (for deployment)
 
-### 2. Environment Variables
+### Firebase Setup
 
-Create a `.env` file in the root directory:
+1. Create a project at [Firebase Console](https://console.firebase.google.com/)
+2. Enable Authentication → Google Sign-In
+3. Create Firestore Database (production mode)
+4. Deploy security rules from `FIRESTORE_RULES.txt`
+5. Create required indexes (see `FIRESTORE_INDEXES.md`)
+6. Get your config from Project Settings → General → Your apps → Web
+
+### Environment Variables
+
+Create `.env` in the root:
 
 ```env
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
 
-### 3. Firestore Security Rules
-
-Update your Firestore security rules in Firebase Console → Firestore Database → Rules:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users can read/write their own user document
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Groups: only members can read, creator can write
-    match /groups/{groupId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.members;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.createdBy;
-      // Creator can update, or user can update when accepting invite (adding themselves)
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.createdBy ||
-        (request.auth.uid in request.resource.data.members && 
-         !(request.auth.uid in resource.data.members))
-      );
-    }
-    
-    // Expenses: only authenticated users can read/write
-    match /expenses/{expenseId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.createdBy;
-    }
-    
-    // Activities: only authenticated users can read/write
-    match /activities/{activityId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth != null;
-    }
-    
-    // Invites: users can read invites sent to their email
-    match /invites/{inviteId} {
-      allow read: if request.auth != null && 
-        request.auth.token.email != null &&
-        resource.data.invitedEmail == request.auth.token.email.toLowerCase();
-      allow create: if request.auth != null && 
-        request.auth.uid == request.resource.data.invitedBy;
-      allow update: if request.auth != null && 
-        request.auth.token.email != null &&
-        resource.data.invitedEmail == request.auth.token.email.toLowerCase();
-      allow delete: if request.auth != null && 
-        request.auth.uid == resource.data.invitedBy;
-    }
-  }
-}
-```
-
-### 4. Firestore Indexes
-
-You may need to create composite indexes in Firestore:
-
-1. Go to Firestore Database > Indexes
-2. Create the following indexes:
-   - Collection: `groups`
-     - Fields: `members` (Array), `createdAt` (Descending)
-   - Collection: `expenses`
-     - Fields: `groupId` (Ascending), `createdAt` (Descending)
-   - Collection: `activities`
-     - Fields: `groupId` (Ascending), `createdAt` (Descending)
-   - Collection: `invites`
-     - Fields: `invitedEmail` (Ascending), `status` (Ascending), `createdAt` (Descending)
-
-### 5. Install Dependencies
+### Installation
 
 ```bash
 npm install
-```
-
-### 6. Run Development Server
-
-```bash
 npm run dev
 ```
 
-### 7. Deploy to Vercel
+### Deployment
 
-1. Push your code to GitHub
-2. Go to [Vercel](https://vercel.com/)
-3. Import your repository
-4. Add environment variables in Vercel dashboard:
-   - Go to Project Settings > Environment Variables
-   - Add all the `VITE_FIREBASE_*` variables
-5. Deploy!
-
-The app will automatically deploy on every push to your main branch.
+1. Push to GitHub
+2. Import repository in Vercel
+3. Add all `VITE_FIREBASE_*` environment variables
+4. Deploy (auto-deploys on push to main)
 
 ## Project Structure
 
 ```
-EvenSteven/
-├── src/
-│   ├── components/       # React components
-│   │   ├── Login.tsx
-│   │   ├── Layout.tsx
-│   │   ├── GroupsList.tsx
-│   │   └── GroupDetails.tsx
-│   ├── contexts/          # React contexts
-│   │   └── AuthContext.tsx
-│   ├── services/         # Firebase services
-│   │   ├── authService.ts
-│   │   └── firebaseService.ts
-│   ├── utils/            # Utility functions
-│   │   └── balanceCalculator.ts
-│   ├── types/            # TypeScript types
-│   │   └── index.ts
-│   ├── config/           # Configuration
-│   │   └── firebase.ts
-│   ├── App.tsx           # Main app component
-│   └── main.tsx          # Entry point
-├── .env.example          # Environment variables template
-├── vercel.json           # Vercel deployment config
-└── package.json
+src/
+├── components/        # React components
+│   ├── Login.tsx
+│   ├── GroupsList.tsx
+│   ├── GroupDetails.tsx
+│   ├── JoinPage.tsx
+│   ├── JoinByCode.tsx
+│   ├── Layout.tsx
+│   ├── AuthWatcher.tsx
+│   └── Toast.tsx
+├── contexts/          # React contexts
+│   └── AuthContext.tsx
+├── services/          # Firebase services
+│   ├── authService.ts
+│   └── firebaseService.ts
+├── utils/             # Utilities
+│   ├── balanceCalculator.ts
+│   └── joinCodeGenerator.ts
+├── hooks/             # Custom hooks
+│   └── useToast.tsx
+├── types/             # TypeScript types
+│   └── index.ts
+└── config/            # Configuration
+    └── firebase.ts
 ```
 
-## Usage
+## How It Works
 
-1. Sign in with Google
-2. Create a group
-3. Add expenses to the group
-4. View balances and optimized settlement suggestions
-5. Track activity in the activity feed
+1. **Sign In** - Use Google to authenticate
+2. **Create Group** - Make a group and get a shareable link or join code
+3. **Add Expenses** - Record expenses and split among members
+4. **View Balances** - See who owes whom in real-time
+5. **Record Payments** - Mark payments as paid (balances update automatically)
+6. **Settle Up** - Use optimized settlement suggestions
+
+## Firestore Collections
+
+- `users` - User profiles
+- `groups` - Group data with members
+- `expenses` - Expense records
+- `payments` - Payment records
+- `activities` - Activity log
 
 ## License
 
