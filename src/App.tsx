@@ -3,11 +3,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
+import { AuthWatcher } from './components/AuthWatcher';
 
 // Lazy load heavy components for better performance
 const GroupsList = lazy(() => import('./components/GroupsList').then(m => ({ default: m.GroupsList })));
 const GroupDetails = lazy(() => import('./components/GroupDetails').then(m => ({ default: m.GroupDetails })));
 const JoinPage = lazy(() => import('./components/JoinPage').then(m => ({ default: m.JoinPage })));
+const JoinByCode = lazy(() => import('./components/JoinByCode').then(m => ({ default: m.JoinByCode })));
 
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -36,12 +38,23 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  return user ? <Navigate to="/groups" replace /> : <>{children}</>;
+  // Check for pending invite - if exists, let AuthWatcher handle redirect
+  if (user) {
+    const pendingInvite = localStorage.getItem('pendingInvite');
+    if (pendingInvite) {
+      // Don't redirect here - let AuthWatcher process the invite first
+      return <>{children}</>;
+    }
+    return <Navigate to="/groups" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 function App() {
   return (
     <AuthProvider>
+      <AuthWatcher />
       <Router>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
@@ -83,6 +96,18 @@ function App() {
                 <Suspense fallback={<LoadingSpinner />}>
                   <JoinPage />
                 </Suspense>
+              }
+            />
+            <Route
+              path="/join-code"
+              element={
+                <PrivateRoute>
+                  <Layout>
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <JoinByCode />
+                    </Suspense>
+                  </Layout>
+                </PrivateRoute>
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />

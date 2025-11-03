@@ -61,12 +61,21 @@ export const GroupsList = () => {
       {ToastComponent}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold">Your Groups</h2>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
-        >
-          + New Group
-        </button>
+        <div className="flex gap-3">
+          <Link
+            to="/join-code"
+            className="bg-emerald-600 hover:bg-emerald-700 px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
+          >
+            <span>🧾</span>
+            <span>Join by Code</span>
+          </Link>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
+          >
+            + New Group
+          </button>
+        </div>
       </div>
 
       {showCreateModal && (
