@@ -20,6 +20,7 @@ export interface Group {
   createdBy: string;
   members: string[]; // User UIDs (keeping for backward compatibility)
   membersDetail?: { [userId: string]: GroupMember }; // Enhanced member details
+  joinCode?: string; // 6-character join code
   createdAt: Date;
 }
 

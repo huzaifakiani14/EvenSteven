@@ -14,6 +14,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { generateJoinCode } from '../utils/joinCodeGenerator';
 import type { User, Group, Expense, Activity, GroupMember } from '../types';
 
 // User operations
@@ -78,9 +79,15 @@ export const createGroup = async (
 ): Promise<string> => {
   const groupsRef = collection(db, 'groups');
   
+  // Generate unique join code
+  // Note: In production with many groups, consider checking for uniqueness
+  // For now, collision probability is extremely low (36^6 = ~2 billion combinations)
+  const joinCode = generateJoinCode();
+  
   // If creator user is provided, create membersDetail with admin
   let groupDoc: any = {
     ...groupData,
+    joinCode,
     createdAt: Timestamp.now(),
   };
   
@@ -109,6 +116,23 @@ export const getGroupsByUser = async (userId: string): Promise<Group[]> => {
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate() || new Date(),
   })) as Group[];
+};
+
+export const getGroupByJoinCode = async (joinCode: string): Promise<Group | null> => {
+  const groupsRef = collection(db, 'groups');
+  const q = query(groupsRef, where('joinCode', '==', joinCode.toUpperCase()));
+  const querySnapshot = await getDocs(q);
+  
+  if (querySnapshot.empty) {
+    return null;
+  }
+  
+  const doc = querySnapshot.docs[0];
+  return {
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate() || new Date(),
+  } as Group;
 };
 
 export const getGroup = async (groupId: string): Promise<Group | null> => {

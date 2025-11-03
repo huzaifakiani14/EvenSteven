@@ -125,13 +125,17 @@ export const GroupDetails = () => {
     if (!groupId || !group) return;
 
     const inviteLink = `${window.location.origin}/join?groupId=${groupId}`;
+    
+    const shareText = group.joinCode
+      ? `Join ${group.name} on EvenSteven 💸\n\nLink: ${inviteLink}\nOr use code: ${group.joinCode}`
+      : `Join ${group.name} on EvenSteven 💸\n\n${inviteLink}`;
 
     // Check if Web Share API is available (mobile devices)
     if (navigator.share) {
       try {
         await navigator.share({
           title: `Join ${group.name} on EvenSteven 💸`,
-          text: `Let's split expenses easily! Tap below to join:`,
+          text: shareText,
           url: inviteLink,
         });
         showToast('✅ Invite link shared successfully!', 'success');
@@ -140,12 +144,12 @@ export const GroupDetails = () => {
         if (err.name !== 'AbortError') {
           console.error('Share failed:', err);
           // Fallback to clipboard
-          await handleCopyToClipboard(inviteLink);
+          await handleCopyToClipboard(shareText);
         }
       }
     } else {
       // Fallback to clipboard for desktop
-      await handleCopyToClipboard(inviteLink);
+      await handleCopyToClipboard(shareText);
     }
   }, [groupId, group, showToast]);
 
@@ -376,6 +380,36 @@ export const GroupDetails = () => {
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-semibold">Group Members</h3>
           </div>
+
+          {/* Join Code Display */}
+          {group.joinCode && (
+            <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-lg p-6 border border-purple-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-lg font-semibold text-white mb-1">Join Code</h4>
+                  <p className="text-purple-200 text-sm mb-3">
+                    Share this code with friends to let them join easily
+                  </p>
+                  <div className="flex items-center space-x-3">
+                    <code className="bg-black bg-opacity-30 px-4 py-2 rounded-lg text-2xl font-mono tracking-widest text-white">
+                      {group.joinCode}
+                    </code>
+                    <button
+                      onClick={() => {
+                        const codeLink = `${window.location.origin}/join?code=${group.joinCode}`;
+                        navigator.clipboard.writeText(codeLink).then(() => {
+                          showToast('📋 Join code link copied!', 'success');
+                        });
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm transition-colors"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             {group.membersDetail ? (

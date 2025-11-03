@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
+import { getGroupByJoinCode } from '../services/firebaseService';
+import { isValidJoinCode } from '../utils/joinCodeGenerator';
 import type { Group } from '../types';
 
 export const JoinPage = () => {
@@ -12,30 +14,59 @@ export const JoinPage = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [showCodeInput, setShowCodeInput] = useState(false);
   const { showToast, ToastComponent } = useToast();
 
   const groupId = searchParams.get('groupId');
+  const codeParam = searchParams.get('code');
 
   useEffect(() => {
     const loadGroup = async () => {
-      if (!groupId) {
-        setError('Invalid invite link. Missing group ID.');
-        setLoading(false);
-        return;
+      // Check if join code is provided in URL
+      if (codeParam) {
+        try {
+          const groupData = await getGroupByJoinCode(codeParam);
+          if (groupData) {
+            setGroup(groupData);
+            setLoading(false);
+            return;
+          } else {
+            setError('Invalid join code. Group not found.');
+            setShowCodeInput(true);
+            setLoading(false);
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error loading group by code:', error);
+          setError(error.message || 'Failed to load group.');
+          setShowCodeInput(true);
+          setLoading(false);
+          return;
+        }
       }
 
-      try {
-        const { getGroup } = await import('../services/firebaseService');
-        const groupData = await getGroup(groupId);
-        if (groupData) {
-          setGroup(groupData);
-        } else {
-          setError('Group not found or has been deleted.');
+      // Check if groupId is provided in URL
+      if (groupId) {
+        try {
+          const { getGroup } = await import('../services/firebaseService');
+          const groupData = await getGroup(groupId);
+          if (groupData) {
+            setGroup(groupData);
+          } else {
+            setError('Group not found or has been deleted.');
+            setShowCodeInput(true);
+          }
+        } catch (error: any) {
+          console.error('Error loading group:', error);
+          setError(error.message || 'Failed to load group.');
+          setShowCodeInput(true);
+        } finally {
+          setLoading(false);
         }
-      } catch (error: any) {
-        console.error('Error loading group:', error);
-        setError(error.message || 'Failed to load group.');
-      } finally {
+      } else {
+        // No groupId or code - show code input
+        setShowCodeInput(true);
         setLoading(false);
       }
     };
@@ -43,7 +74,7 @@ export const JoinPage = () => {
     if (!authLoading) {
       loadGroup();
     }
-  }, [groupId, authLoading]);
+  }, [groupId, codeParam, authLoading]);
 
   const handleAccept = async () => {
     if (!user || !group) return;
@@ -98,6 +129,42 @@ export const JoinPage = () => {
     navigate('/groups');
   };
 
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !joinCode.trim()) return;
+
+    const code = joinCode.trim().toUpperCase();
+    if (!isValidJoinCode(code)) {
+      setError('Please enter a valid 6-character code.');
+      showToast('Invalid code format. Please use 6 letters/numbers.', 'error');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      setError('');
+      const groupData = await getGroupByJoinCode(code);
+      
+      if (!groupData) {
+        setError('Invalid code. No group found with this code.');
+        showToast('Invalid join code. Please check and try again.', 'error');
+        setProcessing(false);
+        return;
+      }
+
+      setGroup(groupData);
+      setShowCodeInput(false);
+      // Automatically join if code is valid
+      await handleAccept();
+    } catch (error: any) {
+      console.error('Error joining by code:', error);
+      const errorMsg = error.message || 'Failed to join group. Please try again.';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
+      setProcessing(false);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -142,8 +209,71 @@ export const JoinPage = () => {
     );
   }
 
+  // Show code input if no group loaded and no URL params
+  if (showCodeInput && !group) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+        {ToastComponent}
+        <div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-8">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-white mb-2">Join Group by Code</h2>
+            <p className="text-gray-400 text-sm">Enter the 6-character join code</p>
+          </div>
+
+          {error && (
+            <div className="bg-red-900 bg-opacity-30 border border-red-600 rounded-lg p-4 mb-6">
+              <p className="text-red-300 text-sm">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleJoinByCode} className="space-y-4">
+            <div>
+              <label className="block text-gray-300 mb-2 text-sm">Join Code</label>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => {
+                  setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
+                  setError('');
+                }}
+                placeholder="ABC123"
+                maxLength={6}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white text-center text-2xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                autoFocus
+                disabled={processing}
+              />
+              <p className="text-gray-400 text-xs mt-2 text-center">
+                Enter the 6-character code shared by the group admin
+              </p>
+            </div>
+            <button
+              type="submit"
+              disabled={processing || !isValidJoinCode(joinCode)}
+              className="w-full bg-green-600 hover:bg-green-700 px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+            >
+              {processing ? 'Joining...' : 'Join Group'}
+            </button>
+          </form>
+
+          <div className="mt-6 pt-6 border-t border-gray-700 text-center">
+            <button
+              onClick={() => navigate('/groups')}
+              className="text-gray-400 hover:text-white text-sm"
+            >
+              ← Back to Groups
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!group) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
   }
 
   return (
