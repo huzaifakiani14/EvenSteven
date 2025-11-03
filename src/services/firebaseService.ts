@@ -121,18 +121,27 @@ export const getGroupsByUser = async (userId: string): Promise<Group[]> => {
 export const getGroupByJoinCode = async (joinCode: string): Promise<Group | null> => {
   const groupsRef = collection(db, 'groups');
   const q = query(groupsRef, where('joinCode', '==', joinCode.toUpperCase()));
-  const querySnapshot = await getDocs(q);
   
-  if (querySnapshot.empty) {
-    return null;
+  try {
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      return null;
+    }
+    
+    const doc = querySnapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate() || new Date(),
+    } as Group;
+  } catch (error: any) {
+    console.error('Error getting group by join code:', error);
+    if (error?.code === 'permission-denied') {
+      throw new Error('Permission denied. Please check Firestore security rules allow querying by joinCode.');
+    }
+    throw error;
   }
-  
-  const doc = querySnapshot.docs[0];
-  return {
-    id: doc.id,
-    ...doc.data(),
-    createdAt: doc.data().createdAt?.toDate() || new Date(),
-  } as Group;
 };
 
 export const getGroup = async (groupId: string): Promise<Group | null> => {

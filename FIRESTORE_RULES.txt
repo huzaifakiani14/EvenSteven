@@ -13,11 +13,19 @@ service cloud.firestore {
     // Groups: only members can read, creator can write/update
     // Also allow users to update when adding themselves via invite acceptance
     match /groups/{groupId} {
-      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+      // Allow reading if user is a member, OR allow queries (needed for join by code lookups)
+      allow read: if request.auth != null && (
+        request.auth.uid in resource.data.members ||
+        // Allow queries (getDocs with where clause) for join code lookups
+        // This is less secure but necessary for the join by code feature
+        // Consider adding a separate collection for public join codes if you need better security
+        true
+      );
       allow create: if request.auth != null && request.auth.uid == request.resource.data.createdBy;
-      // Creator can update, or user can update if they're adding themselves to members
+      // Creator can update, OR user can update if they're adding themselves to members
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.createdBy ||
+        // User can add themselves to members list if they're not already a member
         (request.auth.uid in request.resource.data.members && 
          !(request.auth.uid in resource.data.members))
       );

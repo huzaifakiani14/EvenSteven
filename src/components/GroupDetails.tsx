@@ -276,11 +276,33 @@ export const GroupDetails = () => {
       )}
       
       <div className="flex items-center justify-between mb-6">
-        <div>
+        <div className="flex-1">
           <Link to="/groups" className="text-blue-400 hover:text-blue-300 mb-2 inline-block">
             ← Back to Groups
           </Link>
-          <h2 className="text-3xl font-bold">{group.name}</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-bold">{group.name}</h2>
+            {/* Join Code Badge */}
+            {group.joinCode && (
+              <div className="flex items-center gap-2 bg-purple-900 bg-opacity-50 border border-purple-600 rounded-lg px-4 py-2">
+                <span className="text-purple-300 text-sm font-semibold">Join Code:</span>
+                <code className="bg-black bg-opacity-30 px-3 py-1 rounded text-lg font-mono tracking-widest text-white">
+                  {group.joinCode}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(group.joinCode!).then(() => {
+                      showToast('📋 Join code copied!', 'success');
+                    });
+                  }}
+                  className="text-purple-300 hover:text-white transition-colors"
+                  title="Copy join code"
+                >
+                  📋
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -502,27 +524,39 @@ export const GroupDetails = () => {
           {/* Join Code Display */}
           {group.joinCode && (
             <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-lg p-6 border border-purple-700">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex-1">
                   <h4 className="text-lg font-semibold text-white mb-1">Join Code</h4>
                   <p className="text-purple-200 text-sm mb-3">
-                    Share this code with friends to let them join easily
+                    Share this code with friends to let them join easily. They can enter it on the "Join by Code" page.
                   </p>
-                  <div className="flex items-center space-x-3">
-                    <code className="bg-black bg-opacity-30 px-4 py-2 rounded-lg text-2xl font-mono tracking-widest text-white">
+                  <div className="flex items-center space-x-3 flex-wrap gap-3">
+                    <code className="bg-black bg-opacity-30 px-4 py-3 rounded-lg text-2xl font-mono tracking-widest text-white">
                       {group.joinCode}
                     </code>
-                    <button
-                      onClick={() => {
-                        const codeLink = `${window.location.origin}/join?code=${group.joinCode}`;
-                        navigator.clipboard.writeText(codeLink).then(() => {
-                          showToast('📋 Join code link copied!', 'success');
-                        });
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm transition-colors"
-                    >
-                      Copy Link
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(group.joinCode!).then(() => {
+                            showToast('📋 Join code copied!', 'success');
+                          });
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm transition-colors"
+                      >
+                        Copy Code
+                      </button>
+                      <button
+                        onClick={() => {
+                          const codeLink = `${window.location.origin}/join?code=${group.joinCode}`;
+                          navigator.clipboard.writeText(codeLink).then(() => {
+                            showToast('📋 Join code link copied!', 'success');
+                          });
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm transition-colors"
+                      >
+                        Copy Link
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
