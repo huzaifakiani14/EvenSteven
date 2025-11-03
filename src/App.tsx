@@ -80,11 +80,9 @@ function App() {
             <Route
               path="/join"
               element={
-                <PrivateRoute>
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <JoinPage />
-                  </Suspense>
-                </PrivateRoute>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <JoinPage />
+                </Suspense>
               }
             />
             <Route path="*" element={<Navigate to="/" replace />} />

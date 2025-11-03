@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { getGroup, subscribeToExpenses, createExpense, updateExpense, subscribeToActivities } from '../services/firebaseService';
 import { calculateBalances, minimizeTransactions } from '../utils/balanceCalculator';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ import type { User } from '../types';
 
 export const GroupDetails = () => {
   const { groupId } = useParams<{ groupId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -22,7 +23,22 @@ export const GroupDetails = () => {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [selectedPaidBy, setSelectedPaidBy] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'expenses' | 'balances' | 'activity' | 'members'>('expenses');
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const { showToast, ToastComponent } = useToast();
+  
+  // Check if user just joined (from URL param)
+  useEffect(() => {
+    if (searchParams.get('joined') === 'true') {
+      setShowWelcomeBanner(true);
+      // Remove the query param from URL
+      setSearchParams({}, { replace: true });
+      // Auto-hide banner after 5 seconds
+      const timer = setTimeout(() => {
+        setShowWelcomeBanner(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!groupId || !user) return;
@@ -236,6 +252,29 @@ export const GroupDetails = () => {
   return (
     <div>
       {ToastComponent}
+      
+      {/* Welcome Banner */}
+      {showWelcomeBanner && group && (
+        <div className="mb-6 bg-gradient-to-r from-green-900 to-emerald-900 border border-green-700 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🎉</span>
+            <div>
+              <h3 className="text-white font-semibold">Welcome to {group.name}!</h3>
+              <p className="text-green-200 text-sm">
+                You can now add or view expenses with your group 👋
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowWelcomeBanner(false)}
+            className="text-green-300 hover:text-white transition-colors"
+            aria-label="Close banner"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between mb-6">
         <div>
           <Link to="/groups" className="text-blue-400 hover:text-blue-300 mb-2 inline-block">

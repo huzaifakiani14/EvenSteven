@@ -22,6 +22,46 @@ export const JoinPage = () => {
   const codeParam = searchParams.get('code');
 
   useEffect(() => {
+    // If user is not logged in but we have invite params, save them to localStorage
+    if (!authLoading && !user && (groupId || codeParam)) {
+      const inviteData = {
+        groupId: groupId || null,
+        code: codeParam || null,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('pendingInvite', JSON.stringify(inviteData));
+      navigate('/?invite=true');
+      return;
+    }
+
+    // If user just logged in and there's a pending invite, process it
+    if (!authLoading && user) {
+      const pendingInviteStr = localStorage.getItem('pendingInvite');
+      if (pendingInviteStr) {
+        try {
+          const pendingInvite = JSON.parse(pendingInviteStr);
+          // Check if invite is not too old (24 hours)
+          if (Date.now() - pendingInvite.timestamp < 24 * 60 * 60 * 1000) {
+            // Use pending invite data if no URL params
+            if (!groupId && !codeParam && pendingInvite.groupId) {
+              navigate(`/join?groupId=${pendingInvite.groupId}`, { replace: true });
+              return;
+            }
+            if (!groupId && !codeParam && pendingInvite.code) {
+              navigate(`/join?code=${pendingInvite.code}`, { replace: true });
+              return;
+            }
+          } else {
+            // Expired invite
+            localStorage.removeItem('pendingInvite');
+          }
+        } catch (error) {
+          console.error('Error parsing pending invite:', error);
+          localStorage.removeItem('pendingInvite');
+        }
+      }
+    }
+
     const loadGroup = async () => {
       // Check if join code is provided in URL
       if (codeParam) {
@@ -71,10 +111,12 @@ export const JoinPage = () => {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && user) {
       loadGroup();
+    } else if (!authLoading && !user) {
+      setLoading(false);
     }
-  }, [groupId, codeParam, authLoading]);
+  }, [groupId, codeParam, authLoading, user, navigate]);
 
   const handleAccept = async () => {
     if (!user || !group) return;
@@ -106,20 +148,28 @@ export const JoinPage = () => {
           membersDetail,
         } as any);
         
-        showToast('🎉 Joined group successfully!', 'success');
+        // Clear pending invite from localStorage
+        localStorage.removeItem('pendingInvite');
+        
+        showToast(`🎉 You've joined ${group.name} successfully!`, 'success');
+        
+        // Redirect to group page
+        navigate(`/groups/${group.id}?joined=true`, { replace: true });
       } else {
+        // Clear pending invite even if already a member
+        localStorage.removeItem('pendingInvite');
         showToast('You are already a member of this group.', 'info');
+        
+        // Still redirect to group page
+        navigate(`/groups/${group.id}`, { replace: true });
       }
-
-      // Small delay to show toast before navigation
-      setTimeout(() => {
-        navigate(`/groups/${group.id}`);
-      }, 500);
     } catch (error: any) {
       console.error('Error joining group:', error);
       const errorMsg = error.message || 'Failed to join group. Please try again.';
       setError(errorMsg);
       showToast(errorMsg, 'error');
+      // Clear pending invite on error
+      localStorage.removeItem('pendingInvite');
     } finally {
       setProcessing(false);
     }
@@ -154,8 +204,10 @@ export const JoinPage = () => {
 
       setGroup(groupData);
       setShowCodeInput(false);
-      // Automatically join if code is valid
-      await handleAccept();
+      // Automatically join if code is valid - trigger after state update
+      setTimeout(() => {
+        handleAccept();
+      }, 100);
     } catch (error: any) {
       console.error('Error joining by code:', error);
       const errorMsg = error.message || 'Failed to join group. Please try again.';
@@ -172,6 +224,31 @@ export const JoinPage = () => {
       </div>
     );
   }
+
+  // Auto-accept invite when user logs in with pending invite
+  useEffect(() => {
+    if (!authLoading && user && group && !processing) {
+      const pendingInviteStr = localStorage.getItem('pendingInvite');
+      if (pendingInviteStr) {
+        try {
+          const pendingInvite = JSON.parse(pendingInviteStr);
+          // Auto-accept if group matches pending invite
+          if (
+            (pendingInvite.groupId === group.id) ||
+            (pendingInvite.code && codeParam === pendingInvite.code)
+          ) {
+            // Small delay to ensure UI is ready
+            setTimeout(() => {
+              handleAccept();
+            }, 100);
+          }
+        } catch (error) {
+          console.error('Error processing auto-accept:', error);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, group?.id, processing, codeParam]);
 
   if (!user) {
     return (
