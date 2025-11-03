@@ -12,6 +12,7 @@ import {
   orderBy,
   onSnapshot,
   Timestamp,
+  limit,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { generateJoinCode } from '../utils/joinCodeGenerator';
@@ -207,7 +208,12 @@ export const createExpense = async (
 
 export const getExpensesByGroup = async (groupId: string): Promise<Expense[]> => {
   const expensesRef = collection(db, 'expenses');
-  const q = query(expensesRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const q = query(
+    expensesRef,
+    where('groupId', '==', groupId),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => ({
     id: doc.id,
@@ -221,9 +227,8 @@ export const subscribeToExpenses = (groupId: string, callback: (expenses: Expens
   const q = query(
     expensesRef, 
     where('groupId', '==', groupId), 
-    orderBy('createdAt', 'desc')
-    // Limit for performance - can be increased if needed
-    // Note: Remove limit() if you want all expenses, but add Firestore index for performance
+    orderBy('createdAt', 'desc'),
+    limit(50)
   );
   return onSnapshot(q, (snapshot) => {
     const expenses = snapshot.docs.map((doc) => ({
@@ -302,7 +307,12 @@ export const createActivity = async (activityData: Omit<Activity, 'id' | 'create
 
 export const getActivitiesByGroup = async (groupId: string): Promise<Activity[]> => {
   const activitiesRef = collection(db, 'activities');
-  const q = query(activitiesRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const q = query(
+    activitiesRef,
+    where('groupId', '==', groupId),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => ({
     id: doc.id,
@@ -316,9 +326,8 @@ export const subscribeToActivities = (groupId: string, callback: (activities: Ac
   const q = query(
     activitiesRef, 
     where('groupId', '==', groupId), 
-    orderBy('createdAt', 'desc')
-    // Limit for performance - showing last 50 activities
-    // Note: Remove limit() if you want all activities, but add Firestore index
+    orderBy('createdAt', 'desc'),
+    limit(50)
   );
   return onSnapshot(q, (snapshot) => {
     const activities = snapshot.docs.map((doc) => ({
@@ -412,7 +421,12 @@ export const createPayment = async (
 
 export const getPaymentsByGroup = async (groupId: string): Promise<Payment[]> => {
   const paymentsRef = collection(db, 'payments');
-  const q = query(paymentsRef, where('groupId', '==', groupId), orderBy('createdAt', 'desc'));
+  const q = query(
+    paymentsRef,
+    where('groupId', '==', groupId),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => ({
     id: doc.id,
@@ -426,7 +440,8 @@ export const subscribeToPayments = (groupId: string, callback: (payments: Paymen
   const q = query(
     paymentsRef, 
     where('groupId', '==', groupId), 
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(50)
   );
   return onSnapshot(
     q, 

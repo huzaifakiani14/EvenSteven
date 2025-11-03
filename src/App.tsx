@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
 import { AuthWatcher } from './components/AuthWatcher';
+import SkeletonLoader from './components/SkeletonLoader';
 
 // Lazy load heavy components for better performance
 const GroupsList = lazy(() => import('./components/GroupsList').then(m => ({ default: m.GroupsList })));
@@ -56,7 +57,7 @@ function App() {
     <AuthProvider>
       <Router>
         <AuthWatcher />
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={<SkeletonLoader />}>
           <Routes>
             <Route
               path="/"
@@ -71,7 +72,7 @@ function App() {
               element={
                 <PrivateRoute>
                   <Layout>
-                    <Suspense fallback={<LoadingSpinner />}>
+                    <Suspense fallback={<SkeletonLoader />}>
                       <GroupsList />
                     </Suspense>
                   </Layout>
@@ -83,7 +84,7 @@ function App() {
               element={
                 <PrivateRoute>
                   <Layout>
-                    <Suspense fallback={<LoadingSpinner />}>
+                    <Suspense fallback={<SkeletonLoader />}>
                       <GroupDetails />
                     </Suspense>
                   </Layout>
@@ -93,7 +94,7 @@ function App() {
             <Route
               path="/join"
               element={
-                <Suspense fallback={<LoadingSpinner />}>
+                <Suspense fallback={<SkeletonLoader />}>
                   <JoinPage />
                 </Suspense>
               }
@@ -103,7 +104,7 @@ function App() {
               element={
                 <PrivateRoute>
                   <Layout>
-                    <Suspense fallback={<LoadingSpinner />}>
+                    <Suspense fallback={<SkeletonLoader />}>
                       <JoinByCode />
                     </Suspense>
                   </Layout>
