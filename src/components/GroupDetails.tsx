@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getGroup, subscribeToExpenses, createExpense, subscribeToActivities } from '../services/firebaseService';
+import { getGroup, subscribeToExpenses, createExpense, updateExpense, subscribeToActivities } from '../services/firebaseService';
 import { calculateBalances, minimizeTransactions } from '../utils/balanceCalculator';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../hooks/useToast';
@@ -16,9 +16,11 @@ export const GroupDetails = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [users, setUsers] = useState<Map<string, User>>(new Map());
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseTitle, setExpenseTitle] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [selectedPaidBy, setSelectedPaidBy] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'expenses' | 'balances' | 'activity' | 'members'>('expenses');
   const { showToast, ToastComponent } = useToast();
 
@@ -74,16 +76,17 @@ export const GroupDetails = () => {
       }
 
       // Always include the person who paid in the sharedWith array
-      const sharedWith = selectedMembers.includes(user.uid)
+      const paidBy = selectedPaidBy || user.uid;
+      const sharedWith = selectedMembers.includes(paidBy)
         ? selectedMembers
-        : [...selectedMembers, user.uid];
+        : [...selectedMembers, paidBy];
 
       await createExpense(
         {
           groupId,
           title: expenseTitle.trim(),
           amount,
-          paidBy: user.uid,
+          paidBy,
           sharedWith,
           createdBy: user.uid,
         },
@@ -92,15 +95,74 @@ export const GroupDetails = () => {
 
       // Success: close modal, reset form, show toast
       showToast('💸 Expense added successfully!', 'success');
-      setExpenseTitle('');
-      setExpenseAmount('');
-      setSelectedMembers([]);
+      resetExpenseForm();
       setShowExpenseModal(false);
     } catch (error) {
       console.error('Error creating expense:', error);
       showToast('❌ Failed to add expense. Please try again.', 'error');
     }
-  }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, showToast]);
+  }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast]);
+
+  const handleUpdateExpense = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !editingExpense || !expenseTitle.trim() || !expenseAmount || selectedMembers.length === 0) return;
+
+    try {
+      const amount = parseFloat(expenseAmount);
+      if (isNaN(amount) || amount <= 0) {
+        showToast('Please enter a valid amount', 'error');
+        return;
+      }
+
+      // Always include the person who paid in the sharedWith array
+      const paidBy = selectedPaidBy || user.uid;
+      const sharedWith = selectedMembers.includes(paidBy)
+        ? selectedMembers
+        : [...selectedMembers, paidBy];
+
+      await updateExpense(
+        editingExpense.id,
+        {
+          title: expenseTitle.trim(),
+          amount,
+          paidBy,
+          sharedWith,
+        },
+        user.name
+      );
+
+      // Success: close modal, reset form, show toast
+      showToast('✅ Expense updated successfully!', 'success');
+      resetExpenseForm();
+      setShowExpenseModal(false);
+      setEditingExpense(null);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      showToast('❌ Failed to update expense. Please try again.', 'error');
+    }
+  }, [user, editingExpense, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast]);
+
+  const resetExpenseForm = useCallback(() => {
+    setExpenseTitle('');
+    setExpenseAmount('');
+    setSelectedMembers([]);
+    setSelectedPaidBy('');
+    setEditingExpense(null);
+  }, []);
+
+  const handleEditExpense = useCallback((expense: Expense) => {
+    setEditingExpense(expense);
+    setExpenseTitle(expense.title);
+    setExpenseAmount(expense.amount.toString());
+    setSelectedMembers(expense.sharedWith);
+    setSelectedPaidBy(expense.paidBy);
+    setShowExpenseModal(true);
+  }, []);
+
+  const handleCloseExpenseModal = useCallback(() => {
+    setShowExpenseModal(false);
+    resetExpenseForm();
+  }, [resetExpenseForm]);
 
   const toggleMember = useCallback((memberId: string) => {
     setSelectedMembers((prev) =>
@@ -191,7 +253,13 @@ export const GroupDetails = () => {
             <span className="sm:hidden">Invite</span>
           </button>
           <button
-            onClick={() => setShowExpenseModal(true)}
+            onClick={() => {
+              resetExpenseForm();
+              if (user) {
+                setSelectedPaidBy(user.uid);
+              }
+              setShowExpenseModal(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
           >
             + Add Expense
@@ -263,9 +331,20 @@ export const GroupDetails = () => {
                   <div key={expense.id} className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="text-xl font-semibold">{expense.title}</h3>
-                      <span className="text-2xl font-bold text-green-400">
-                        ${expense.amount.toFixed(2)}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-bold text-green-400">
+                          ${expense.amount.toFixed(2)}
+                        </span>
+                        {expense.createdBy === user?.uid && (
+                          <button
+                            onClick={() => handleEditExpense(expense)}
+                            className="text-blue-400 hover:text-blue-300 px-3 py-1 rounded transition-colors"
+                            title="Edit expense"
+                          >
+                            ✏️ Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-gray-400 mb-3">
                       Paid by <span className="text-white font-semibold">{paidByUser?.name || 'Unknown'}</span>
@@ -486,9 +565,11 @@ export const GroupDetails = () => {
       {/* Expense Modal */}
       {showExpenseModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold mb-4">Add New Expense</h3>
-            <form onSubmit={handleCreateExpense}>
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">
+              {editingExpense ? 'Edit Expense' : 'Add New Expense'}
+            </h3>
+            <form onSubmit={editingExpense ? handleUpdateExpense : handleCreateExpense}>
               <input
                 type="text"
                 value={expenseTitle}
@@ -508,6 +589,25 @@ export const GroupDetails = () => {
                 required
               />
               <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Paid by:</label>
+                <select
+                  value={selectedPaidBy}
+                  onChange={(e) => setSelectedPaidBy(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 mb-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  {group.members.map((memberId) => {
+                    const memberUser = users.get(memberId);
+                    return (
+                      <option key={memberId} value={memberId}>
+                        {memberUser?.name || 'Unknown'}
+                        {memberId === user?.uid && ' (You)'}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div className="mb-4">
                 <label className="block text-gray-300 mb-2">Split with:</label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {group.members.map((memberId) => {
@@ -525,7 +625,7 @@ export const GroupDetails = () => {
                         />
                         <span className="text-gray-300">
                           {memberUser?.name || 'Unknown'}
-                          {memberId === user.uid && ' (You)'}
+                          {memberId === user?.uid && ' (You)'}
                         </span>
                       </label>
                     );
@@ -535,7 +635,7 @@ export const GroupDetails = () => {
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowExpenseModal(false)}
+                  onClick={handleCloseExpenseModal}
                   className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   Cancel
@@ -545,7 +645,7 @@ export const GroupDetails = () => {
                   disabled={selectedMembers.length === 0}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  Add Expense
+                  {editingExpense ? 'Update Expense' : 'Add Expense'}
                 </button>
               </div>
             </form>

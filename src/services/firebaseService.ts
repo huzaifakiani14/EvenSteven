@@ -226,6 +226,57 @@ export const subscribeToExpenses = (groupId: string, callback: (expenses: Expens
   });
 };
 
+export const updateExpense = async (
+  expenseId: string,
+  updates: Partial<Omit<Expense, 'id' | 'createdAt' | 'createdBy' | 'groupId'>>,
+  userName?: string
+): Promise<void> => {
+  const expenseRef = doc(db, 'expenses', expenseId);
+  
+  // Get the current expense to create an activity message
+  const expenseSnap = await getDoc(expenseRef);
+  if (!expenseSnap.exists()) {
+    throw new Error('Expense not found');
+  }
+  
+  const currentExpense = expenseSnap.data() as Expense;
+  
+  // Update the expense
+  await updateDoc(expenseRef, updates);
+  
+  // Create activity - fetch userName if not provided
+  let finalUserName = userName || '';
+  if (!finalUserName) {
+    const user = await getUser(currentExpense.createdBy);
+    finalUserName = user?.name || 'Someone';
+  }
+  
+  // Create activity for expense update
+  const changes = [];
+  if (updates.title && updates.title !== currentExpense.title) {
+    changes.push(`title to "${updates.title}"`);
+  }
+  if (updates.amount && updates.amount !== currentExpense.amount) {
+    changes.push(`amount to $${updates.amount.toFixed(2)}`);
+  }
+  if (updates.sharedWith && JSON.stringify(updates.sharedWith.sort()) !== JSON.stringify(currentExpense.sharedWith.sort())) {
+    changes.push('shared members');
+  }
+  if (updates.paidBy && updates.paidBy !== currentExpense.paidBy) {
+    changes.push('paid by');
+  }
+  
+  if (changes.length > 0) {
+    await createActivity({
+      groupId: currentExpense.groupId,
+      type: 'expense_added', // Reusing type, could add 'expense_updated' later
+      message: `updated expense "${updates.title || currentExpense.title}": ${changes.join(', ')}`,
+      userId: currentExpense.createdBy,
+      userName: finalUserName,
+    });
+  }
+};
+
 export const deleteExpense = async (expenseId: string): Promise<void> => {
   const expenseRef = doc(db, 'expenses', expenseId);
   await deleteDoc(expenseRef);
