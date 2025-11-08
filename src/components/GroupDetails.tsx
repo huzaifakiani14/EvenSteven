@@ -113,6 +113,14 @@ export const GroupDetails = () => {
     loadUsers();
   }, [group]);
 
+  const resetExpenseForm = useCallback(() => {
+    setExpenseTitle('');
+    setExpenseAmount('');
+    setSelectedMembers([]);
+    setSelectedPaidBy('');
+    setEditingExpense(null);
+  }, []);
+
   const handleCreateExpense = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !groupId || !expenseTitle.trim() || !expenseAmount || selectedMembers.length === 0) return;
@@ -142,15 +150,18 @@ export const GroupDetails = () => {
         user.name
       );
 
-      // Success: close modal, reset form, show toast
-      showToast('💸 Expense added successfully!', 'success');
+      // Success: close modal immediately, reset form, show toast
       resetExpenseForm();
       setShowExpenseModal(false);
-    } catch (error) {
+      showToast('💸 Expense added successfully!', 'success');
+    } catch (error: any) {
       console.error('Error creating expense:', error);
-      showToast('❌ Failed to add expense. Please try again.', 'error');
+      
+      // Show specific error message if available
+      const errorMessage = error?.message || 'Failed to add expense. Please try again.';
+      showToast(`❌ ${errorMessage}`, 'error');
     }
-  }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast]);
+  }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast, resetExpenseForm]);
 
   const handleUpdateExpense = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,15 +200,7 @@ export const GroupDetails = () => {
       console.error('Error updating expense:', error);
       showToast('❌ Failed to update expense. Please try again.', 'error');
     }
-  }, [user, editingExpense, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast]);
-
-  const resetExpenseForm = useCallback(() => {
-    setExpenseTitle('');
-    setExpenseAmount('');
-    setSelectedMembers([]);
-    setSelectedPaidBy('');
-    setEditingExpense(null);
-  }, []);
+  }, [user, editingExpense, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast, resetExpenseForm]);
 
   const handleEditExpense = useCallback((expense: Expense) => {
     setEditingExpense(expense);

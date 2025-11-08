@@ -15,10 +15,23 @@ const hasValidConfig =
   firebaseConfig.apiKey && 
   firebaseConfig.apiKey !== '' &&
   firebaseConfig.authDomain && 
-  firebaseConfig.authDomain !== '';
+  firebaseConfig.authDomain !== '' &&
+  firebaseConfig.projectId &&
+  firebaseConfig.projectId !== '';
 
 if (!hasValidConfig) {
-  console.error('Firebase configuration missing - check environment variables');
+  const missingVars = [];
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey === '') missingVars.push('VITE_FIREBASE_API_KEY');
+  if (!firebaseConfig.authDomain || firebaseConfig.authDomain === '') missingVars.push('VITE_FIREBASE_AUTH_DOMAIN');
+  if (!firebaseConfig.projectId || firebaseConfig.projectId === '') missingVars.push('VITE_FIREBASE_PROJECT_ID');
+  
+  console.error('Firebase configuration missing - check environment variables:', missingVars);
+  console.error('Current config:', {
+    hasApiKey: !!firebaseConfig.apiKey,
+    hasAuthDomain: !!firebaseConfig.authDomain,
+    hasProjectId: !!firebaseConfig.projectId,
+    projectId: firebaseConfig.projectId,
+  });
 }
 
 const app = initializeApp(firebaseConfig);

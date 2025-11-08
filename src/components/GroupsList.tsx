@@ -43,22 +43,26 @@ export const GroupsList = () => {
         }
       );
       
-      // Success: close modal, reset form, show toast
-      showToast('✅ Group created successfully!', 'success');
+      // Success: close modal immediately, reset form, show toast
       setGroupName('');
       setShowCreateModal(false);
+      setLoading(false); // Reset loading immediately
+      
+      showToast('✅ Group created successfully!', 'success');
 
       // Navigate immediately to the new group for faster perceived performance
       if (newGroupId) {
         navigate(`/groups/${newGroupId}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating group:', error);
-      showToast('❌ Failed to create group. Please try again.', 'error');
-    } finally {
       setLoading(false);
+      
+      // Show specific error message if available
+      const errorMessage = error?.message || 'Failed to create group. Please try again.';
+      showToast(`❌ ${errorMessage}`, 'error');
     }
-  }, [user, groupName, loading, showToast]);
+  }, [user, groupName, loading, showToast, navigate]);
 
   if (!user) return null;
 

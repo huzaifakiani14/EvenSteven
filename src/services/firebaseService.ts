@@ -78,6 +78,10 @@ export const createGroup = async (
   groupData: Omit<Group, 'id' | 'createdAt'>,
   creatorUser?: { uid: string; name: string; email: string }
 ): Promise<string> => {
+  if (!groupData.createdBy) {
+    throw new Error('Group creator ID is required');
+  }
+  
   const groupsRef = collection(db, 'groups');
   
   // Generate unique join code
@@ -104,8 +108,34 @@ export const createGroup = async (
     groupDoc.membersDetail = membersDetail;
   }
   
-  const docRef = await addDoc(groupsRef, groupDoc);
-  return docRef.id;
+  try {
+    const docRef = await addDoc(groupsRef, groupDoc);
+    
+    // Verify the document was created
+    if (!docRef.id) {
+      throw new Error('Failed to create group: no document ID returned');
+    }
+    
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Error creating group in Firestore:', error);
+    
+    // Provide specific error messages for common issues
+    if (error?.code === 'permission-denied') {
+      throw new Error('Permission denied. Please check Firestore security rules allow group creation. Make sure you are authenticated and the rules allow creating groups.');
+    }
+    
+    if (error?.code === 'unavailable') {
+      throw new Error('Firestore is temporarily unavailable. Please check your internet connection and try again.');
+    }
+    
+    if (error?.code === 'deadline-exceeded') {
+      throw new Error('Request timed out. Please check your internet connection and try again.');
+    }
+    
+    // Re-throw with a more descriptive message
+    throw new Error(`Failed to create group: ${error?.message || 'Unknown error'}`);
+  }
 };
 
 export const getGroupsByUser = async (userId: string): Promise<Group[]> => {
@@ -182,28 +212,64 @@ export const createExpense = async (
   expenseData: Omit<Expense, 'id' | 'createdAt'>,
   userName?: string
 ): Promise<string> => {
-  const expensesRef = collection(db, 'expenses');
-  const docRef = await addDoc(expensesRef, {
-    ...expenseData,
-    createdAt: Timestamp.now(),
-  });
-  
-  // Create activity - fetch userName if not provided
-  let finalUserName = userName || '';
-  if (!finalUserName) {
-    const user = await getUser(expenseData.createdBy);
-    finalUserName = user?.name || 'Someone';
+  if (!expenseData.groupId || !expenseData.createdBy) {
+    throw new Error('Group ID and creator ID are required');
   }
   
-  await createActivity({
-    groupId: expenseData.groupId,
-    type: 'expense_added',
-    message: `added expense "${expenseData.title}" for $${expenseData.amount.toFixed(2)}`,
-    userId: expenseData.createdBy,
-    userName: finalUserName,
-  });
+  const expensesRef = collection(db, 'expenses');
   
-  return docRef.id;
+  try {
+    const docRef = await addDoc(expensesRef, {
+      ...expenseData,
+      createdAt: Timestamp.now(),
+    });
+    
+    // Verify the document was created
+    if (!docRef.id) {
+      throw new Error('Failed to create expense: no document ID returned');
+    }
+    
+    // Create activity - fetch userName if not provided
+    // Don't let activity creation failure block expense creation
+    try {
+      let finalUserName = userName || '';
+      if (!finalUserName) {
+        const user = await getUser(expenseData.createdBy);
+        finalUserName = user?.name || 'Someone';
+      }
+      
+      await createActivity({
+        groupId: expenseData.groupId,
+        type: 'expense_added',
+        message: `added expense "${expenseData.title}" for $${expenseData.amount.toFixed(2)}`,
+        userId: expenseData.createdBy,
+        userName: finalUserName,
+      });
+    } catch (activityError) {
+      // Log but don't fail the expense creation
+      console.error('Error creating activity for expense:', activityError);
+    }
+    
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Error creating expense in Firestore:', error);
+    
+    // Provide specific error messages for common issues
+    if (error?.code === 'permission-denied') {
+      throw new Error('Permission denied. Please check Firestore security rules allow expense creation. Make sure you are authenticated and the rules allow creating expenses.');
+    }
+    
+    if (error?.code === 'unavailable') {
+      throw new Error('Firestore is temporarily unavailable. Please check your internet connection and try again.');
+    }
+    
+    if (error?.code === 'deadline-exceeded') {
+      throw new Error('Request timed out. Please check your internet connection and try again.');
+    }
+    
+    // Re-throw with a more descriptive message
+    throw new Error(`Failed to create expense: ${error?.message || 'Unknown error'}`);
+  }
 };
 
 export const getExpensesByGroup = async (groupId: string): Promise<Expense[]> => {
