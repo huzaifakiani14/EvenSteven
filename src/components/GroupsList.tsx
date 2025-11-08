@@ -26,10 +26,17 @@ export const GroupsList = () => {
 
   const handleCreateGroup = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !groupName.trim() || loading) return;
+    if (!user || !groupName.trim() || loading) {
+      console.log('[handleCreateGroup] Early return:', { hasUser: !!user, groupName: groupName.trim(), loading });
+      return;
+    }
+
+    console.log('[handleCreateGroup] Starting group creation:', { userId: user.uid, groupName: groupName.trim() });
 
     try {
       setLoading(true);
+      console.log('[handleCreateGroup] Calling createGroup...');
+      
       const newGroupId = await createGroup(
         {
           name: groupName.trim(),
@@ -43,6 +50,8 @@ export const GroupsList = () => {
         }
       );
       
+      console.log('[handleCreateGroup] Group created, newGroupId:', newGroupId);
+      
       // Success: close modal immediately, reset form, show toast
       setGroupName('');
       setShowCreateModal(false);
@@ -52,14 +61,21 @@ export const GroupsList = () => {
 
       // Navigate immediately to the new group for faster perceived performance
       if (newGroupId) {
+        console.log('[handleCreateGroup] Navigating to group:', newGroupId);
         navigate(`/groups/${newGroupId}`);
       }
     } catch (error: any) {
-      console.error('Error creating group:', error);
+      console.error('[handleCreateGroup] Error creating group:', {
+        error,
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+      });
       setLoading(false);
       
       // Show specific error message if available
       const errorMessage = error?.message || 'Failed to create group. Please try again.';
+      console.log('[handleCreateGroup] Showing error toast:', errorMessage);
       showToast(`❌ ${errorMessage}`, 'error');
     }
   }, [user, groupName, loading, showToast, navigate]);

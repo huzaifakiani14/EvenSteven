@@ -14,9 +14,21 @@ import {
   Timestamp,
   limit,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { generateJoinCode } from '../utils/joinCodeGenerator';
 import type { User, Group, Expense, Activity, GroupMember, Payment } from '../types';
+
+// Timeout wrapper for Firestore operations to prevent infinite hangs
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    }),
+  ]);
+};
 
 // User operations
 export const createUser = async (uid: string, userData: Omit<User, 'uid' | 'createdAt'>): Promise<void> => {
@@ -78,9 +90,27 @@ export const createGroup = async (
   groupData: Omit<Group, 'id' | 'createdAt'>,
   creatorUser?: { uid: string; name: string; email: string }
 ): Promise<string> => {
+  // Verify authentication state
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('You must be signed in to create a group');
+  }
+  
   if (!groupData.createdBy) {
     throw new Error('Group creator ID is required');
   }
+  
+  // Verify createdBy matches current user
+  if (groupData.createdBy !== currentUser.uid) {
+    throw new Error('Group creator ID must match the signed-in user');
+  }
+  
+  console.log('[createGroup] Starting group creation:', {
+    createdBy: groupData.createdBy,
+    currentUser: currentUser.uid,
+    name: groupData.name,
+    members: groupData.members,
+  });
   
   const groupsRef = collection(db, 'groups');
   
@@ -108,8 +138,20 @@ export const createGroup = async (
     groupDoc.membersDetail = membersDetail;
   }
   
+  console.log('[createGroup] Document to create:', {
+    name: groupDoc.name,
+    createdBy: groupDoc.createdBy,
+    members: groupDoc.members,
+    joinCode: groupDoc.joinCode,
+  });
+  
   try {
-    const docRef = await addDoc(groupsRef, groupDoc);
+    const docRef = await withTimeout(
+      addDoc(groupsRef, groupDoc),
+      15000 // 15 second timeout
+    );
+    
+    console.log('[createGroup] Group created successfully:', docRef.id);
     
     // Verify the document was created
     if (!docRef.id) {
@@ -118,7 +160,12 @@ export const createGroup = async (
     
     return docRef.id;
   } catch (error: any) {
-    console.error('Error creating group in Firestore:', error);
+    console.error('[createGroup] Error creating group in Firestore:', {
+      error,
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack,
+    });
     
     // Provide specific error messages for common issues
     if (error?.code === 'permission-denied') {
@@ -129,7 +176,7 @@ export const createGroup = async (
       throw new Error('Firestore is temporarily unavailable. Please check your internet connection and try again.');
     }
     
-    if (error?.code === 'deadline-exceeded') {
+    if (error?.code === 'deadline-exceeded' || error?.message?.includes('timed out')) {
       throw new Error('Request timed out. Please check your internet connection and try again.');
     }
     
@@ -212,17 +259,50 @@ export const createExpense = async (
   expenseData: Omit<Expense, 'id' | 'createdAt'>,
   userName?: string
 ): Promise<string> => {
+  // Verify authentication state
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('You must be signed in to create an expense');
+  }
+  
   if (!expenseData.groupId || !expenseData.createdBy) {
     throw new Error('Group ID and creator ID are required');
   }
   
+  // Verify createdBy matches current user
+  if (expenseData.createdBy !== currentUser.uid) {
+    throw new Error('Expense creator ID must match the signed-in user');
+  }
+  
+  console.log('[createExpense] Starting expense creation:', {
+    groupId: expenseData.groupId,
+    createdBy: expenseData.createdBy,
+    currentUser: currentUser.uid,
+    title: expenseData.title,
+    amount: expenseData.amount,
+  });
+  
   const expensesRef = collection(db, 'expenses');
   
+  const expenseDoc = {
+    ...expenseData,
+    createdAt: Timestamp.now(),
+  };
+  
+  console.log('[createExpense] Document to create:', {
+    groupId: expenseDoc.groupId,
+    createdBy: expenseDoc.createdBy,
+    title: expenseDoc.title,
+    amount: expenseDoc.amount,
+  });
+  
   try {
-    const docRef = await addDoc(expensesRef, {
-      ...expenseData,
-      createdAt: Timestamp.now(),
-    });
+    const docRef = await withTimeout(
+      addDoc(expensesRef, expenseDoc),
+      15000 // 15 second timeout
+    );
+    
+    console.log('[createExpense] Expense created successfully:', docRef.id);
     
     // Verify the document was created
     if (!docRef.id) {
@@ -247,12 +327,17 @@ export const createExpense = async (
       });
     } catch (activityError) {
       // Log but don't fail the expense creation
-      console.error('Error creating activity for expense:', activityError);
+      console.error('[createExpense] Error creating activity for expense:', activityError);
     }
     
     return docRef.id;
   } catch (error: any) {
-    console.error('Error creating expense in Firestore:', error);
+    console.error('[createExpense] Error creating expense in Firestore:', {
+      error,
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack,
+    });
     
     // Provide specific error messages for common issues
     if (error?.code === 'permission-denied') {
@@ -263,7 +348,7 @@ export const createExpense = async (
       throw new Error('Firestore is temporarily unavailable. Please check your internet connection and try again.');
     }
     
-    if (error?.code === 'deadline-exceeded') {
+    if (error?.code === 'deadline-exceeded' || error?.message?.includes('timed out')) {
       throw new Error('Request timed out. Please check your internet connection and try again.');
     }
     

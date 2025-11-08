@@ -123,7 +123,23 @@ export const GroupDetails = () => {
 
   const handleCreateExpense = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !groupId || !expenseTitle.trim() || !expenseAmount || selectedMembers.length === 0) return;
+    if (!user || !groupId || !expenseTitle.trim() || !expenseAmount || selectedMembers.length === 0) {
+      console.log('[handleCreateExpense] Early return:', {
+        hasUser: !!user,
+        groupId,
+        expenseTitle: expenseTitle.trim(),
+        expenseAmount,
+        selectedMembers: selectedMembers.length,
+      });
+      return;
+    }
+
+    console.log('[handleCreateExpense] Starting expense creation:', {
+      userId: user.uid,
+      groupId,
+      title: expenseTitle.trim(),
+      amount: expenseAmount,
+    });
 
     try {
       const amount = parseFloat(expenseAmount);
@@ -138,6 +154,8 @@ export const GroupDetails = () => {
         ? selectedMembers
         : [...selectedMembers, paidBy];
 
+      console.log('[handleCreateExpense] Calling createExpense...');
+      
       await createExpense(
         {
           groupId,
@@ -150,15 +168,23 @@ export const GroupDetails = () => {
         user.name
       );
 
+      console.log('[handleCreateExpense] Expense created successfully');
+
       // Success: close modal immediately, reset form, show toast
       resetExpenseForm();
       setShowExpenseModal(false);
       showToast('💸 Expense added successfully!', 'success');
     } catch (error: any) {
-      console.error('Error creating expense:', error);
+      console.error('[handleCreateExpense] Error creating expense:', {
+        error,
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack,
+      });
       
       // Show specific error message if available
       const errorMessage = error?.message || 'Failed to add expense. Please try again.';
+      console.log('[handleCreateExpense] Showing error toast:', errorMessage);
       showToast(`❌ ${errorMessage}`, 'error');
     }
   }, [user, groupId, expenseTitle, expenseAmount, selectedMembers, selectedPaidBy, showToast, resetExpenseForm]);
