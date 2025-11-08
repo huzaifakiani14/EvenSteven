@@ -25,17 +25,62 @@ export const GroupsList = () => {
   }, [user]);
 
   const handleCreateGroup = useCallback(async (e: React.FormEvent) => {
+    // IMMEDIATE LOG - This should appear first
+    console.log('🚀 [handleCreateGroup] FORM SUBMITTED - Handler called!', {
+      timestamp: new Date().toISOString(),
+      hasEvent: !!e,
+    });
+    
+    // Alert for debugging (remove in production)
+    if (import.meta.env.DEV) {
+      console.warn('🔍 DEBUG: Form submit handler triggered');
+    }
+    
     e.preventDefault();
+    
+    console.log('[handleCreateGroup] After preventDefault, checking conditions:', {
+      hasUser: !!user,
+      userUid: user?.uid,
+      groupName: groupName,
+      groupNameTrimmed: groupName.trim(),
+      groupNameLength: groupName.trim().length,
+      loading,
+    });
+    
     if (!user || !groupName.trim() || loading) {
-      console.log('[handleCreateGroup] Early return:', { hasUser: !!user, groupName: groupName.trim(), loading });
+      console.warn('[handleCreateGroup] ⚠️ EARLY RETURN - Conditions not met:', {
+        hasUser: !!user,
+        groupName: groupName.trim(),
+        loading,
+      });
+      // Show error toast for debugging
+      if (!user) {
+        showToast('❌ Error: Not signed in', 'error');
+      } else if (!groupName.trim()) {
+        showToast('❌ Error: Group name is empty', 'error');
+      } else if (loading) {
+        showToast('❌ Error: Already creating group', 'error');
+      }
       return;
     }
 
-    console.log('[handleCreateGroup] Starting group creation:', { userId: user.uid, groupName: groupName.trim() });
+    console.log('[handleCreateGroup] ✅ All conditions met, starting group creation:', {
+      userId: user.uid,
+      userName: user.name,
+      groupName: groupName.trim(),
+    });
 
     try {
+      console.log('[handleCreateGroup] Setting loading to true...');
       setLoading(true);
-      console.log('[handleCreateGroup] Calling createGroup...');
+      console.log('[handleCreateGroup] Loading set, calling createGroup...');
+      
+      // Add a timeout fallback to show error if operation hangs
+      const timeoutId = setTimeout(() => {
+        console.error('[handleCreateGroup] ⚠️ TIMEOUT: Operation taking too long (>20s)');
+        showToast('❌ Operation is taking too long. Please check your connection and try again.', 'error');
+        setLoading(false);
+      }, 20000);
       
       const newGroupId = await createGroup(
         {
@@ -50,7 +95,9 @@ export const GroupsList = () => {
         }
       );
       
-      console.log('[handleCreateGroup] Group created, newGroupId:', newGroupId);
+      clearTimeout(timeoutId);
+      
+      console.log('[handleCreateGroup] ✅ Group created successfully, newGroupId:', newGroupId);
       
       // Success: close modal immediately, reset form, show toast
       setGroupName('');
@@ -65,16 +112,19 @@ export const GroupsList = () => {
         navigate(`/groups/${newGroupId}`);
       }
     } catch (error: any) {
-      console.error('[handleCreateGroup] Error creating group:', {
+      console.error('[handleCreateGroup] ❌ ERROR creating group:', {
         error,
+        errorType: typeof error,
         message: error?.message,
         code: error?.code,
         stack: error?.stack,
+        name: error?.name,
+        toString: error?.toString(),
       });
       setLoading(false);
       
       // Show specific error message if available
-      const errorMessage = error?.message || 'Failed to create group. Please try again.';
+      const errorMessage = error?.message || error?.toString() || 'Failed to create group. Please try again.';
       console.log('[handleCreateGroup] Showing error toast:', errorMessage);
       showToast(`❌ ${errorMessage}`, 'error');
     }
@@ -109,14 +159,25 @@ export const GroupsList = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Create New Group</h3>
-            <form onSubmit={handleCreateGroup}>
+            <form onSubmit={(e) => {
+              console.log('📝 FORM onSubmit triggered');
+              handleCreateGroup(e);
+            }}>
               <input
                 type="text"
                 value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
+                onChange={(e) => {
+                  console.log('📝 Input changed:', e.target.value);
+                  setGroupName(e.target.value);
+                }}
                 placeholder="Group name"
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 sm:px-4 py-2 mb-3 sm:mb-4 text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    console.log('📝 Enter key pressed in input');
+                  }
+                }}
               />
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3">
                 <button
